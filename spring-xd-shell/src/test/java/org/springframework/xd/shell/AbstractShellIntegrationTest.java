@@ -31,7 +31,6 @@ import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
-import org.junit.ClassRule;
 
 import org.springframework.shell.Bootstrap;
 import org.springframework.shell.core.CommandResult;
@@ -75,7 +74,7 @@ public abstract class AbstractShellIntegrationTest extends RandomConfigurationSu
 
 	private final IdGenerator idGenerator = new AlternativeJdkIdGenerator();
 
-	@ClassRule
+	// @ClassRule
 	public static RedisTestSupport redisAvailableRule = new RedisTestSupport();
 
 	private static final Log logger = LogFactory.getLog(AbstractShellIntegrationTest.class);
