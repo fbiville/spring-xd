@@ -37,14 +37,15 @@ public class JdbcSink extends AbstractModuleFixture implements Disposable {
 
 	private HSQLServerBean hsqlServerBean;
 
-	private SimpleDriverDataSource dataSource;
-
 	private String jdbcUrl;
+
+	private String tableName;
+
+	private String columns;
 
 
 	public JdbcSink start() throws Exception {
 		initDatasource();
-		jdbcTemplate = new JdbcTemplate(dataSource);
 
 		return this;
 	}
@@ -58,7 +59,14 @@ public class JdbcSink extends AbstractModuleFixture implements Disposable {
 
 	@Override
 	protected String toDSL() {
-		return String.format("jdbc --initializeDatabase=true --url=%s", jdbcUrl);
+		String dsl = "jdbc --initializeDatabase=true --url=" + jdbcUrl;
+		if (tableName != null) {
+			dsl += " --tableName=" + tableName;
+		}
+		if (columns != null) {
+			dsl += " --columns=" + columns;
+		}
+		return dsl;
 	}
 
 	/**
@@ -68,7 +76,7 @@ public class JdbcSink extends AbstractModuleFixture implements Disposable {
 	 */
 	private void initDatasource() throws Exception {
 		Properties hsqlProps = new Properties();
-		hsqlProps.setProperty("port", String.valueOf(port));
+		hsqlProps.setProperty("server.port", String.valueOf(port));
 
 		hsqlServerBean = new HSQLServerBean();
 		hsqlServerBean.setServerProperties(hsqlProps);
@@ -76,15 +84,24 @@ public class JdbcSink extends AbstractModuleFixture implements Disposable {
 
 		jdbcUrl = String.format("jdbc:hsqldb:hsql//localhost:%d/jdbcSink", port);
 
-		dataSource = new SimpleDriverDataSource();
+		SimpleDriverDataSource dataSource = new SimpleDriverDataSource();
 		dataSource.setDriverClass(JDBCDriver.class);
 		dataSource.setUrl(jdbcUrl);
+		jdbcTemplate = new JdbcTemplate(dataSource);
 	}
 
 	@Override
 	public void cleanup() {
-		// TODO Auto-generated method stub
-		throw new UnsupportedOperationException("Auto-generated method stub");
+		hsqlServerBean.destroy();
 	}
 
+	public JdbcSink tableName(String tableName) {
+		this.tableName = tableName;
+		return this;
+	}
+
+	public JdbcSink columns(String columns) {
+		this.columns = columns;
+		return this;
+	}
 }

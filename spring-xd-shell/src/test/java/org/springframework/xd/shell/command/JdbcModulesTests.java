@@ -16,29 +16,35 @@
 
 package org.springframework.xd.shell.command;
 
+import static org.hamcrest.Matchers.hasItems;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThat;
+
+import java.util.List;
 
 import org.junit.Test;
 
+import org.springframework.jdbc.core.BeanPropertyRowMapper;
 import org.springframework.xd.shell.command.fixtures.HttpSource;
 import org.springframework.xd.shell.command.fixtures.JdbcSink;
 
 
 /**
+ * Tests for the jdbc related modules.
  * 
+ * @author Eric Bottard
  * @author Florent Biville
  */
 public class JdbcModulesTests extends AbstractStreamIntegrationTest {
 
 	@Test
 	public void testJdbcSinkWith1InsertionAndDefaultConfiguration() throws Exception {
-		System.out.println("totototo");
 		JdbcSink jdbcSink = newJdbcSink().start();
 
 		HttpSource httpSource = newHttpSource();
 
 
-		String streamName = generateStreamName();
+		String streamName = generateStreamName().replaceAll("-", "_");
 		stream().create(streamName, "%s | %s", httpSource, jdbcSink);
 		httpSource.ensureReady().postData("Hi there!");
 
@@ -48,9 +54,87 @@ public class JdbcModulesTests extends AbstractStreamIntegrationTest {
 				jdbcSink.getJdbcTemplate().queryForObject(query, String.class));
 	}
 
+	@Test
+	public void testJdbcSinkWith2InsertionsAndDefaultConfiguration() throws Exception {
+		JdbcSink jdbcSink = newJdbcSink().start();
+
+		HttpSource httpSource = newHttpSource();
+
+
+		String streamName = generateStreamName().replaceAll("-", "_");
+		stream().create(streamName, "%s | %s", httpSource, jdbcSink);
+		httpSource.ensureReady().postData("Hi there!").postData("How are you?");
+
+		String query = String.format("SELECT payload FROM %s", streamName);
+		List<String> result = jdbcSink.getJdbcTemplate().queryForList(query, String.class);
+		assertThat(result, hasItems("Hi there!", "How are you?"));
+	}
+
+	@Test
+	public void testJdbcSinkWithCustomTableName() throws Exception {
+		String tableName = "foobar";
+		JdbcSink jdbcSink = newJdbcSink().tableName(tableName).start();
+
+
+		HttpSource httpSource = newHttpSource();
+
+		stream().create(generateStreamName(), "%s | %s", httpSource, jdbcSink);
+		httpSource.ensureReady().postData("Hi there!");
+
+		String query = String.format("SELECT payload FROM %s", tableName);
+		assertEquals(
+				"Hi there!",
+				jdbcSink.getJdbcTemplate().queryForObject(query, String.class));
+	}
+
+	@Test
+	public void testJdbcSinkWithCustomColumnNames() throws Exception {
+		JdbcSink jdbcSink = newJdbcSink().columns("foo,bar").start();
+
+		HttpSource httpSource = newHttpSource();
+
+
+		String streamName = generateStreamName().replaceAll("-", "_");
+		stream().create(streamName, "%s | %s", httpSource, jdbcSink);
+		String json = "{\"foo\":5, \"bar\": \"hello\"}";
+		httpSource.ensureReady().postData(json);
+
+		String query = String.format("SELECT foo, bar FROM %s", streamName);
+		Result result = jdbcSink.getJdbcTemplate().queryForObject(query, new BeanPropertyRowMapper<>(Result.class));
+		assertEquals("hello", result.getBar());
+		assertEquals("5", result.getFoo());
+	}
+
+	public static class Result {
+
+		private String bar;
+
+		private int foo;
+
+
+		public String getBar() {
+			return bar;
+		}
+
+
+		public int getFoo() {
+			return foo;
+		}
+
+
+		public void setBar(String bar) {
+			this.bar = bar;
+		}
+
+
+		public void setFoo(int foo) {
+			this.foo = foo;
+		}
+
+
+	}
+
 	// tests cases
-	// 2 insertions with default config
-	// insertion with custom table name
 	// insertion with custom column name
 	// insertion into 2 JDBC sinks
 
