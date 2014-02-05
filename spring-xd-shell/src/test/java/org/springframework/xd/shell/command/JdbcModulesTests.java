@@ -91,7 +91,7 @@ public class JdbcModulesTests extends AbstractStreamIntegrationTest {
 	public void testJdbcSinkWithCustomColumnNames() throws Exception {
 		JdbcSink jdbcSink = newJdbcSink().columns("foo,bar").start();
 
-		HttpSource httpSource = newHttpSource();
+		HttpSource httpSource = newHttpSource().useContentType("application/json");
 
 
 		String streamName = generateStreamName().replaceAll("-", "_");
