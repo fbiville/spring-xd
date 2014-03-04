@@ -569,6 +569,7 @@ project('spring-xd-extension-splunk') {
 project('spring-xd-extension-mongodb') {
 	description = 'Spring XD Mongodb'
 	dependencies {
+		compile project(':spring-xd-module-spi')
 		compile project(':spring-xd-tuple')
 		compile "org.springframework.batch:spring-batch-core:$springBatchVersion"
 		compile ("org.springframework.data:spring-data-mongodb:$springDataMongoVersion") { exclude group: 'org.slf4j' }
