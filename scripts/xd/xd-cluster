@@ -1,0 +1,121 @@
+#!/usr/bin/env bash
+
+old_port=$PORT
+old_server_port=$SERVER_PORT
+
+## trap
+
+__clean_up() {
+  export PORT=$old_port
+  export SERVER_PORT=$old_server_port
+}
+
+trap __clean_up EXIT SIGINT SIGQUIT
+
+
+## utilities functions
+
+__is_valid_port() {
+  local port=$1
+  if [[ "$port" =~ ^[0-9]+$ ]] && (( "$port" > 0 )) && (( "$port" <= 65535 )); then
+    echo 0
+  else
+    echo 1
+  fi
+}
+
+__is_available_port() {
+  local port=$1
+  (echo >/dev/tcp/localhost/$port) &>/dev/null
+  local connection_status=$?
+  if [ $connection_status -eq 0 ]; then
+    echo 1 # connection is successful which means port is already busy
+  else
+    echo 0
+  fi
+}
+
+__next_port() {
+  local port=$1
+  ((port=(port+1)%65536))
+  if [ $port -eq 0 ]; then
+    echo 1024
+  else
+    echo $port
+  fi
+}
+
+__next_available_port() {
+  local port=$1
+  while [ $(__is_available_port $port) -eq 1 ]; do
+    port=$(__next_port $port)
+  done
+  echo $port
+}
+
+
+usage() { 
+	echo -e "Usage: $0 <admin_start_port> <container_start_port> [<count_of_admin_instances>] [<count_of_container_instances>]
+
+\tadmin_start_port		port to assign* to Spring XD administration app(s)	
+\tcontainer_start_port		port to assign* to Spring XD container(s)
+\tcount_of_admin_instances	number of Spring XD administration instances to start (default: 1)
+\tcount_of_container_instances	number of Spring XD containers to start (default: 1)
+
+*If the initial port is not available, $0 will find the next available port, starting from the provided one." 1>&2; exit 1; 
+}
+
+## argument retrieval
+
+if [ -z "$1" ] || [ -z "$2" ]; then
+  echo -e "Missing mandatory <admin_start_port> OR <container_start_port>\n" 1>&2
+  usage
+fi
+
+admin_start_port=$1
+valid=$(__is_valid_port $admin_start_port)
+if [ $valid -eq 1 ]; then
+  echo -e "Invalid <admin_start_port>\n" 1>&2
+  usage
+fi
+
+container_start_port=$2
+valid=$(__is_valid_port $container_start_port)
+if [ $valid -eq 1 ]; then
+  echo -e "Invalid <container_start_port>\n" 1>&2
+  usage
+fi
+
+admin_instance_count=1
+if [ -n "$3" ]; then
+  admin_instance_count=$3
+  if [[ $admin_instance_count -lt 1 ]]; then
+    echo -e "Invalid <count_of_admin_instances>\n" 1>&2
+    usage
+  fi
+fi
+
+container_instance_count=1
+if [ -n "$4" ]; then
+  container_instance_count=$4
+  if [[ $container_instance_count -lt 1 ]]; then
+    echo -e "Invalid <count_of_container_instances>\n" 1>&2
+    usage
+  fi
+fi
+
+## instances startup
+
+### admin
+for (( admin_instance=1; admin_instance<=$admin_instance_count; admin_instance++ )); do
+  export SERVER_PORT=$(__next_available_port $admin_start_port)
+  echo "= Starting Spring XD administration application at port: $SERVER_PORT"
+  ./xd-admin
+done
+
+### container
+for (( container_instance=1; container_instance<=$container_instance_count; container_instance++ )); do
+  export PORT=$(__next_available_port $container_start_port)
+  echo "= Starting Spring XD container at port: $PORT"
+  ./xd-container
+done
